@@ -4,20 +4,25 @@
 /* $begin echoclientmain */
 #include "csapp.h"
 
+#define QUIT "quit"
+#define LIST_USERS "list-users"
+
 /* Type of Threads Client will run */
 enum ThreadType {Sender, Receiver};
 
 int clientfd;
-char *host, *port, buf[MAXLINE];
+char *host, *port;
 rio_t rio;
 int killProgram;
 
 void *thread(void *vargp);
 void senderRoutine();
 void receiverRoutine();
-void sendDataToServer();
+void sendDataToServer(char[]);
+void clearBuffer(char[], int);
 
 int main(int argc, char **argv) {
+    char buf[MAXLINE];
     pthread_t tid;
 
     if (argc != 4) {
@@ -80,22 +85,36 @@ void *thread(void *vargp) {
 
 /* Routine to reciever input and send messages to the server */
 void senderRoutine() {
-    printf("SenderRoutineThread\n");
+    char buf[MAXLINE];
+
+    while (!killProgram && Fgets(buf, MAXLINE, stdin) != NULL) {
+        if (strcmp(buf, QUIT) == 0) {
+            killProgram = 1;
+        }
+        sendDataToServer(buf);
+        clearBuffer(buf, MAXLINE);
+    }
 }
 
 /* Routine to listen to message from the server */
 void receiverRoutine() {
-    printf("ReceivRoutineThread\n");
+    char buf[MAXLINE];
+
+    while (!killProgram) {
+        Rio_readlineb(&rio, buf, MAXLINE);
+        fprintf(stdout, "%s\n", buf);
+        clearBuffer(buf, MAXLINE);
+    }
 }
 
 /* Function to quickly send data in buffer to server */
-void sendDataToServer() {
+void sendDataToServer(char buf[]) {
     Rio_writen(clientfd, buf, strlen(buf));
 }
 
-/* Clear String Buffer */
-void clearBuffer() {
-    for(int i = 0; i < MAXLINE; i++) {
+/* Clear a given buffer */
+void clearBuffer(char buf[], int len) {
+    for(int i = 0; i < len; i++) {
         buf[i] = 0;
     }
 }
