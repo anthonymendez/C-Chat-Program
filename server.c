@@ -5,6 +5,7 @@
 #include "csapp.h"
 
 void *thread(void *vargp);
+char *userList();
 
 struct clientInfo {
     struct clientInfo* next;
@@ -64,15 +65,17 @@ int hasPrefix(const char* str, const char* prefix) {
 }
 
 // Returns non-zero only if quit command was received
-int handleMessage(const char* cmd, int len) {
+int handleMessage(const char* cmd, int len, int connfd) {
     // TODO: Test if statements' conditions
     if(len == 4 && strncmp("quit\0", cmd, 5) == 0) { // Quit
         printf("[debug] quit received\n");
         return 1;
     } else if(len == 10 && strncmp("list-users\0", cmd, 11) == 0) { // List users
+        // TODO: Test to make sure client receives properly
         printf("[debug] list-users received\n");
-        // TODO: Handle
-        // Idea: make string with for/doWhile loop over linked list firstClient
+        char* userListString = userList();
+        Rio_writen(connfd, userListString, strlen(userListString));
+        free(userListString);
     } else if(cmd[0] == '@') { // Direct msg
         printf("[debug] direct message received\n");
         sendDirectMsg(cmd);
@@ -115,14 +118,13 @@ void clientHandlerStart(struct clientInfo* info)
     while((n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) { // TODO: Should this break the loop?
         printf("[debug] len: %d, -msg-: -%s-\n", n, buf);
         buf[n - 1] = '\0'; // Clear trailing newline character
-        if(handleMessage(buf, n - 1) != 0) // Quit command received
+        if(handleMessage(buf, n - 1, connfd) != 0) // Quit command received
             break;
         clearBuffer(buf, MAXLINE);
     }
 
     printf("[debug] loop broken, client quit (or disconnected/closed?)\n");
     // TODO: Drop client here
-    // TODO: Do we check if there are no more clients, and kill the server if so??
     return;
 
     /*
@@ -132,6 +134,23 @@ void clientHandlerStart(struct clientInfo* info)
         Rio_writen(connfd, buf, n);
     }
     */
+}
+
+/* Iterate through clients and concatenate clients usernames to string 
+ * Returns string like so
+ * "@Ant
+ *  @Tony
+ *  @Josh
+ * "
+ */
+char* userList() {
+    struct clientInfo *clientNode = firstClient;
+    char *userListString = calloc(MAXLINE, sizeof(char));
+    while (clientNode != NULL) {
+        sprintf(userListString, "%s@%s\n", userListString, clientNode->username);
+        clientNode = clientNode->next;
+    }
+    return userListString;
 }
 
 int main(int argc, char **argv) 
@@ -166,6 +185,7 @@ void *thread(void *vargp)
     Pthread_detach(pthread_self()); //line:conc:echoservert:detach
     clientHandlerStart(newClient);
     Close(newClient->connfd);
+    free(newClient);
     return NULL;
 }
 /* $end echoservertmain */
