@@ -4,9 +4,6 @@
 /* $begin echoclientmain */
 #include "csapp.h"
 
-#define QUIT "quit"
-#define LIST_USERS "list-users"
-
 /* Type of Threads Client will run */
 enum ThreadType {Sender, Receiver};
 
@@ -29,30 +26,32 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: %s <host> <port> <username>\n", argv[0]);
 	    exit(0);
     }
+
+    // Connect to the server
     host = argv[1];
     port = argv[2];
-
-    killProgram = 0;
-    enum ThreadType S = Sender,
-                    R = Receiver;
-
     clientfd = Open_clientfd(host, port);
     Rio_readinitb(&rio, clientfd);
 
+    killProgram = 0;
+    Pthread_create(&tid, NULL, thread, NULL); // Start receiverRoutine() in a new detached thread
+
+    /*
+    // TODO: make the strcat calls overflow-safe? Easy example:
+    if (strlen(argv[3]) > MAXLINE - 1) { // Leave room for \n (no \0 needed I think)
+        fprintf(stderr, "username too long!\n");
+	    exit(0);
+    }
+    */
+    // Send username immediately
     strcat(buf, argv[3]);
     strcat(buf, "\n");
-    Rio_writen(clientfd, buf, strlen(buf)); // Send username immediately
-
+    Rio_writen(clientfd, buf, strlen(buf));
     printf("[debug] -username- sent (before newline): -%s-\n", argv[3]);
 
-    Pthread_create(&tid, NULL, thread, &S);
-    Pthread_create(&tid, NULL, thread, &R);
+    senderRoutine(); // Use this thread for senderRoutine()
 
-    while(!killProgram); //TODO: Remove/replace with code
-    
-    //TODO: make another thread, have one do sending, one do receiving, or whatever the website said
-    
-    /*
+    /* TODO: remove
     //Example input sending/receiving echo loop
     while (Fgets(buf, MAXLINE, stdin) != NULL) {
 	Rio_writen(clientfd, buf, strlen(buf));
@@ -60,26 +59,15 @@ int main(int argc, char **argv) {
 	Fputs(buf, stdout);
     }
     */
-    
+
     Close(clientfd); //line:netp:echoclient:close
     exit(0);
 }
 
 /* Thread routine */
 void *thread(void *vargp) {
-    enum ThreadType threadType = *((enum ThreadType*) vargp);
     Pthread_detach(pthread_self()); //line:conc:echoservert:detach
-
-    // Launch Appropriate ThreadType
-    if (threadType == Sender) {
-        senderRoutine();
-    } else if (threadType == Receiver) {
-        receiverRoutine();
-    } else {
-        // Shouldn't happen, exit program
-        fprintf(stderr, "Tried to launch invalid thread type\n");
-        exit(0);
-    }
+    receiverRoutine();
     return NULL;
 }
 
@@ -87,12 +75,17 @@ void *thread(void *vargp) {
 void senderRoutine() {
     char buf[MAXLINE];
 
+    printf("> ");
+    // Note: Fgets puts a trailing \n\0 into buf (after the text entered by user)
     while (!killProgram && Fgets(buf, MAXLINE, stdin) != NULL) {
-        if (strcmp(buf, QUIT) == 0) {
-            killProgram = 1;
-        }
         sendDataToServer(buf);
+
+        // If buf begins with "quit" followed by \n\0, then quit
+        if (strncmp("quit\n\0", buf, 6) == 0) 
+            killProgram = 1;
+
         clearBuffer(buf, MAXLINE);
+        printf("> "); // Fgets blocks until newline, so it won't be needed here
     }
 }
 
@@ -102,7 +95,11 @@ void receiverRoutine() {
 
     while (!killProgram) {
         Rio_readlineb(&rio, buf, MAXLINE);
-        fprintf(stdout, "%s\n", buf);
+
+        // TODO: test this. also, what if text was typed into console (enter not pressed)?
+        // Maybe don't handle that case? See https://piazza.com/class/jlqsbkrvhww31w?cid=169
+        fprintf(stdout, "\b\b%s\n> ", buf); // Backspace the "> ", print buf, and add "> " newline
+
         clearBuffer(buf, MAXLINE);
     }
 }
