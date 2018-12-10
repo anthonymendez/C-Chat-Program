@@ -98,7 +98,7 @@ void receiverRoutine() {
 
         // TODO: test this. also, what if text was typed into console (enter not pressed)?
         // Maybe don't handle that case? See https://piazza.com/class/jlqsbkrvhww31w?cid=169
-        fprintf(stdout, "\b\b%s> ", buf); // Backspace the "> ", print buf, and add "> " newline
+        fprintf(stdout, "\b\b%s> ", buf); // Backspace the "> ", print buf, and add "> "
 
         clearBuffer(buf, MAXLINE);
     }
