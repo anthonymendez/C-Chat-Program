@@ -9,6 +9,7 @@ char *userList();
 
 struct clientInfo {
     struct clientInfo* next;
+    struct clientInfo* prev;
     char* username;
     int connfd;
 };
@@ -22,13 +23,20 @@ struct clientInfo* addClient(int connfd) {
     if(firstClient == NULL) {
         //TODO: Mutex start?
         firstClient = newClient;
+        firstClient->prev = NULL;
+        firstClient->next = NULL;
         //TODO: Mutex end?
     } else {
         struct clientInfo* lastClient = firstClient;
+        struct clientInfo* prevClient;
         while(lastClient->next != NULL) {
+            prevClient = lastClient;
             lastClient = lastClient->next;
+            lastClient->prev = prevClient;
         }
         //TODO: Mutex start?
+        newClient->prev = lastClient;
+        newClient->next = NULL;
         lastClient->next = newClient;
         //TODO: Mutex end?
     }
@@ -124,7 +132,7 @@ void clientHandlerStart(struct clientInfo* info)
     }
 
     printf("[debug] loop broken, client quit (or disconnected/closed?)\n");
-    // TODO: Drop client here
+    dropClient(info);
     return;
 
     /*
@@ -151,6 +159,27 @@ char* userList() {
         clientNode = clientNode->next;
     }
     return userListString;
+}
+
+void dropClient(struct clientInfo* client) {
+    /* Check for null pointer */
+    if (client == NULL)
+        return;
+
+    /* Check if client is head node */
+    if (client == firstClient) {
+        firstClient = client->next;
+    }
+
+    /* Set next's prev node equal to prev node */
+    if (client->next != NULL) {
+        client->next->prev = client->prev;
+    }
+
+    /* Set prev's next node equal to next node */
+    if (client->prev != NULL) {
+        client->prev->next = client->next;
+    }
 }
 
 int main(int argc, char **argv) 
