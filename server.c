@@ -4,15 +4,16 @@
 /* $begin echoservertmain */
 #include "csapp.h"
 
-void *thread(void *vargp);
-char *userList();
-
 struct clientInfo {
     struct clientInfo* next;
     struct clientInfo* prev;
     char* username;
     int connfd;
 };
+
+char *userList();
+void dropClient(struct clientInfo*);
+void *thread(void*);
 
 struct clientInfo* firstClient = NULL;
 
