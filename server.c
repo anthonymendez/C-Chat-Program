@@ -51,7 +51,7 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     strcpy(msg, cmd);
 
     // Parse to destination username and msg (with error checking)
-    char* token = strtok(cmd, " ");
+    char* token = strtok(msg, " ");
     if (token[0] != '@') {
         printf("Invalid Username! %s\n", token);
         return;
@@ -74,11 +74,12 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     int dest_connfd = search->connfd;
 
     // Get message from cmd
-    sprintf(msg, "@%s %s\n", senderUsername, msg+strlen(token)+1);
-    printf("-[debug]- sending msg: %s", msg);
-    // Send message
-    Rio_writen(dest_connfd, msg, strlen(msg));
+    char* transmit = calloc(MAXLINE, sizeof(char));
+    sprintf(transmit, "@%s %s\n", senderUsername, cmd+strlen(token)+1);
 
+    // Send message
+    Rio_writen(dest_connfd, transmit, strlen(transmit));
+    free(transmit);
     free(msg);
 }
 
