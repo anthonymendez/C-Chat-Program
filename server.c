@@ -4,6 +4,7 @@
 /* $begin echoservertmain */
 #include "csapp.h"
 
+/* Doubly Linked List to store Client Info */
 struct clientInfo {
     struct clientInfo* next;
     struct clientInfo* prev;
@@ -11,22 +12,47 @@ struct clientInfo {
     int connfd;
 };
 
+/* Function Prototypes */
+void lockMutex();
+void unlockMutex();
+struct clientInfo* addClient(int connfd);
+void sendDirectMsg(const char* cmd, char* senderUsername);
+int hasPrefix(const char* str, const char* prefix);
+int handleMessage(const char* cmd, int len, int connfd, char* fromUsername);
+void clearBuffer(char buf[], int len);
+void clientHandlerStart(struct clientInfo* info);
 char *userList();
 void dropClient(struct clientInfo*);
 void *thread(void*);
 
+/* Mutex to make sure threads don't access client info list
+ * at the same time.
+ */
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Head of our client info doubly linked list */
 struct clientInfo* firstClient = NULL;
 
+/* Locks the mutex or waits until it can lock the mutex */
+void lockMutex() {
+    pthread_mutex_lock(&mutex);
+}
+
+/* Unlocks the mutex */
+void unlockMutex() {
+    pthread_mutex_unlock(&mutex);
+}
+
+/* Adds a client to our doubly linked client info list */
 struct clientInfo* addClient(int connfd) {
     struct clientInfo* newClient = (struct clientInfo*) malloc(sizeof(struct clientInfo));
     newClient->connfd = connfd;
-    
-    if(firstClient == NULL) {
-        //TODO: Mutex start?
+
+    lockMutex();
+    if (firstClient == NULL) {
         firstClient = newClient;
         firstClient->prev = NULL;
         firstClient->next = NULL;
-        //TODO: Mutex end?
     } else {
         struct clientInfo* lastClient = firstClient;
         struct clientInfo* prevClient;
@@ -35,16 +61,16 @@ struct clientInfo* addClient(int connfd) {
             lastClient = lastClient->next;
             lastClient->prev = prevClient;
         }
-        //TODO: Mutex start?
         newClient->prev = lastClient;
         newClient->next = NULL;
         lastClient->next = newClient;
-        //TODO: Mutex end?
     }
-    
+    unlockMutex();
+
     return newClient;
 }
 
+/* Sends a message directly to the client specified in CMD */
 void sendDirectMsg(const char* cmd, char* senderUsername) {
     char* destUsr;
     char* msg = calloc(MAXLINE, sizeof(char));
@@ -59,6 +85,7 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     destUsr = token + 1;
 
     // Check if destination user exists
+    lockMutex();
     struct clientInfo* search = firstClient;
     while(search != NULL  && strcmp(search->username, destUsr) != 0) {
         search = search->next;
@@ -67,11 +94,14 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     // Check if we found the username
     if(search == NULL) {
         printf("Username not found!\n");
+        unlockMutex();
         return;
     }
 
     // Get socket from clientInfo  
     int dest_connfd = search->connfd;
+
+    unlockMutex();
 
     // Get message from cmd
     char* transmit = calloc(MAXLINE, sizeof(char));
@@ -121,6 +151,8 @@ void clearBuffer(char buf[], int len) {
     }
 }
 
+/* Handles starting reading and writing loop to client
+ */
 void clientHandlerStart(struct clientInfo* info)
 {
     int connfd = info->connfd;
@@ -153,15 +185,6 @@ void clientHandlerStart(struct clientInfo* info)
 
     printf("[debug] loop broken, client quit (or disconnected/closed?)\n");
     dropClient(info);
-    return;
-
-    /*
-    //Example input receiving/send echo loop
-    while((n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) {
-        printf("server received %d bytes\n", n);
-        Rio_writen(connfd, buf, n);
-    }
-    */
 }
 
 /* Iterate through clients and concatenate clients usernames to string 
@@ -172,19 +195,26 @@ void clientHandlerStart(struct clientInfo* info)
  * "
  */
 char* userList() {
+    lockMutex();
     struct clientInfo *clientNode = firstClient;
     char *userListString = calloc(MAXLINE, sizeof(char));
     while (clientNode != NULL) {
         sprintf(userListString, "%s@%s\n", userListString, clientNode->username);
         clientNode = clientNode->next;
     }
+    unlockMutex();
     return userListString;
 }
 
+/* Drops specified client from list */
 void dropClient(struct clientInfo* client) {
+    lockMutex();
+
     /* Check for null pointer */
-    if (client == NULL)
+    if (client == NULL) {
+        unlockMutex();
         return;
+    }
 
     /* Check if client is head node */
     if (client == firstClient) {
@@ -200,6 +230,8 @@ void dropClient(struct clientInfo* client) {
     if (client->prev != NULL) {
         client->prev->next = client->next;
     }
+
+    unlockMutex();
 }
 
 int main(int argc, char **argv) 
