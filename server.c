@@ -125,19 +125,25 @@ int hasPrefix(const char* str, const char* prefix) {
 
 // Returns non-zero only if quit command was received
 int handleMessage(const char* cmd, int len, int connfd, char* fromUsername) {
-    // TODO: Test if statements' conditions
-    if(len == 4 && strncmp("quit\0", cmd, 5) == 0) { // Quit
+    /* User wants to disconnect from server */
+    if(len == 4 && strncmp("quit\0", cmd, 5) == 0) {
         printf("[debug] quit received\n");
         return 1;
-    } else if(len == 10 && strncmp("list-users\0", cmd, 11) == 0) { // List users
+    }
+    /* User wants to get a list of users connected to server */
+    else if(len == 10 && strncmp("list-users\0", cmd, 11) == 0) {
         printf("[debug] list-users received\n");
         char* userListString = userList();
         Rio_writen(connfd, userListString, strlen(userListString));
         free(userListString);
-    } else if(cmd[0] == '@') { // Direct msg
+    }
+    /* User wants to send a message to a user connected to the server */
+    else if(cmd[0] == '@') {
         printf("[debug] direct message received\n");
         sendDirectMsg(cmd, fromUsername);
-    } else { // Invalid command (not quit, list-users, or @ (direct msg))
+    }
+    /* User sent an invalid command */
+    else { // Invalid command (not quit, list-users, or @ (direct msg))
         printf("[debug] invalid command received\n");
         // TODO: Handle
     }
