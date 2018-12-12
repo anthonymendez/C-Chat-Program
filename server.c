@@ -176,7 +176,7 @@ void clientHandlerStart(struct clientInfo* info)
     usrSlot[n-1] = '\0'; // Add string terminator
     info->username = usrSlot;
     clearBuffer(buf, MAXLINE);
-    printf("[debug] -username- received: -%s-\n", info->username);
+    printf("@%s joined\n", info->username);
 
 
     // TODO: any more initialization I forgot?
@@ -189,7 +189,7 @@ void clientHandlerStart(struct clientInfo* info)
         clearBuffer(buf, MAXLINE);
     }
 
-    printf("[debug] loop broken, client quit (or disconnected/closed?)\n");
+    printf("@%s left\n", info->username);
     dropClient(info);
 }
 
