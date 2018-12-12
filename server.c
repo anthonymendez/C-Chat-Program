@@ -4,6 +4,14 @@
 /* $begin echoservertmain */
 #include "csapp.h"
 
+#define INVALID_CMD "Invalid Command Received\n"
+#define INVALID_USERNAME "Username missing @\n"
+#define USERNAME_NOT_FOUND "Username not found!\n"
+
+#define INVALID_CMD_LEN strlen(INVALID_CMD)
+#define INVALID_USERNAME_LEN strlen(INVALID_USERNAME)
+#define USERNAME_NOT_FOUND_LEN strlen(USERNAME_NOT_FOUND)
+
 /* Doubly Linked List to store Client Info */
 struct clientInfo {
     struct clientInfo* next;
@@ -16,8 +24,7 @@ struct clientInfo {
 void lockMutex();
 void unlockMutex();
 struct clientInfo* addClient(int connfd);
-void sendDirectMsg(const char* cmd, char* senderUsername);
-int hasPrefix(const char* str, const char* prefix);
+void sendDirectMsg(const char* cmd, char* senderUsername, int connfd);
 int handleMessage(const char* cmd, int len, int connfd, char* fromUsername);
 void clearBuffer(char buf[], int len);
 void clientHandlerStart(struct clientInfo* info);
@@ -71,7 +78,7 @@ struct clientInfo* addClient(int connfd) {
 }
 
 /* Sends a message directly to the client specified in CMD */
-void sendDirectMsg(const char* cmd, char* senderUsername) {
+void sendDirectMsg(const char* cmd, char* senderUsername, int connfd) {
     char* destUsr;
     char* msg = calloc(MAXLINE, sizeof(char));
     strcpy(msg, cmd);
@@ -79,7 +86,7 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     // Parse to destination username and msg (with error checking)
     char* token = strtok(msg, " ");
     if (token[0] != '@') {
-        printf("Invalid Username! %s\n", token);
+        Rio_writen(connfd, INVALID_USERNAME, INVALID_USERNAME_LEN);
         return;
     }
     destUsr = token + 1;
@@ -93,7 +100,7 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
 
     // Check if we found the username
     if(search == NULL) {
-        printf("Username not found!\n");
+        Rio_writen(connfd, USERNAME_NOT_FOUND, USERNAME_NOT_FOUND_LEN);
         unlockMutex();
         return;
     }
@@ -113,39 +120,25 @@ void sendDirectMsg(const char* cmd, char* senderUsername) {
     free(msg);
 }
 
-// TODO: This is actually un-used for now... whoops. delete later if not needed
-// Returns non-zero only if str begins with all of prefix
-int hasPrefix(const char* str, const char* prefix) {
-    size_t strLen = strlen(str);
-    size_t preLen = strlen(prefix);
-    
-    // Compare strings, make sure their lengths are non-zero, and make sure prefix isn't longer than str
-    return (strncmp(prefix, str, preLen) == 0 && strLen >= preLen && strLen > 0 && preLen > 0);
-}
-
 // Returns non-zero only if quit command was received
 int handleMessage(const char* cmd, int len, int connfd, char* fromUsername) {
     /* User wants to disconnect from server */
     if(len == 4 && strncmp("quit\0", cmd, 5) == 0) {
-        printf("[debug] quit received\n");
         return 1;
     }
     /* User wants to get a list of users connected to server */
     else if(len == 10 && strncmp("list-users\0", cmd, 11) == 0) {
-        printf("[debug] list-users received\n");
         char* userListString = userList();
         Rio_writen(connfd, userListString, strlen(userListString));
         free(userListString);
     }
     /* User wants to send a message to a user connected to the server */
     else if(cmd[0] == '@') {
-        printf("[debug] direct message received\n");
-        sendDirectMsg(cmd, fromUsername);
+        sendDirectMsg(cmd, fromUsername, connfd);
     }
     /* User sent an invalid command */
-    else { // Invalid command (not quit, list-users, or @ (direct msg))
-        printf("[debug] invalid command received\n");
-        // TODO: Handle
+    else {
+        Rio_writen(connfd, INVALID_CMD, INVALID_CMD_LEN);
     }
     return 0;
 }
@@ -179,10 +172,8 @@ void clientHandlerStart(struct clientInfo* info)
     printf("@%s joined\n", info->username);
 
 
-    // TODO: any more initialization I forgot?
     // Main loop handling client
-    while((n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) { // TODO: Should this break the loop?
-        printf("[debug] len: %d, -msg-: -%s-\n", n, buf);
+    while((n = Rio_readlineb(&rio, buf, MAXLINE)) != 0) {
         buf[n - 1] = '\0'; // Clear trailing newline character
         if(handleMessage(buf, n - 1, connfd, info->username) != 0) // Quit command received
             break;
@@ -240,18 +231,15 @@ void dropClient(struct clientInfo* client) {
     unlockMutex();
 }
 
-int main(int argc, char **argv) 
-{
-    printf("[debug] MAXLINE=%d\n", MAXLINE);
-    
+int main(int argc, char **argv) {
     int listenfd, *connfdp;
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
     pthread_t tid; 
 
     if (argc != 2) {
-	fprintf(stderr, "usage: %s <port>\n", argv[0]);
-	exit(0);
+        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+	    exit(0);
     }
     listenfd = Open_listenfd(argv[1]);
 
