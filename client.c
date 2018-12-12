@@ -19,47 +19,42 @@ void sendDataToServer(char[]);
 void clearBuffer(char[], int);
 
 int main(int argc, char **argv) {
-    char buf[MAXLINE];
-    pthread_t tid;
-
+    /* Check if we have the appropriate arguments */
     if (argc != 4) {
         fprintf(stderr, "usage: %s <host> <port> <username>\n", argv[0]);
 	    exit(0);
     }
 
-    // Connect to the server
+    char buf[MAXLINE];
+    pthread_t tid;
+
+    /* Connect to the server */
     host = argv[1];
     port = argv[2];
     clientfd = Open_clientfd(host, port);
     Rio_readinitb(&rio, clientfd);
 
     killProgram = 0;
-    Pthread_create(&tid, NULL, thread, NULL); // Start receiverRoutine() in a new detached thread
+    /* Start receiverRoutine() in a new detached thread */
+    Pthread_create(&tid, NULL, thread, NULL);
 
-    /*
-    // TODO: make the strcat calls overflow-safe? Easy example:
-    if (strlen(argv[3]) > MAXLINE - 1) { // Leave room for \n (no \0 needed I think)
-        fprintf(stderr, "username too long!\n");
+    /* Check if username provided is too long to be sent
+     * Subtracting 2 to account for \0 charactere
+     */
+    if (strlen(argv[3]) > MAXLINE - 2) {
+        fprintf(stderr, "Username too long!\n");
 	    exit(0);
     }
-    */
-    // Send username immediately
+
+    /* Send username immediately */
     strcat(buf, argv[3]);
     strcat(buf, "\n");
     Rio_writen(clientfd, buf, strlen(buf));
-    printf("[debug] -username- sent (before newline): -%s-\n", argv[3]);
 
-    senderRoutine(); // Use this thread for senderRoutine()
+    /* This thread becomes dedicated for senderRoutine until we quit */
+    senderRoutine();
 
-    /* TODO: remove
-    //Example input sending/receiving echo loop
-    while (Fgets(buf, MAXLINE, stdin) != NULL) {
-	Rio_writen(clientfd, buf, strlen(buf));
-	Rio_readlineb(&rio, buf, MAXLINE);
-	Fputs(buf, stdout);
-    }
-    */
-
+    /* Close connection and exit program */
     Close(clientfd); //line:netp:echoclient:close
     exit(0);
 }
@@ -82,8 +77,11 @@ void senderRoutine() {
         sendDataToServer(buf);
 
         // If buf begins with "quit" followed by \n\0, then quit
-        if (strncmp("quit\n\0", buf, 6) == 0) 
+        if (strncmp("quit\n\0", buf, 6) == 0) {
             killProgram = 1;
+            printf("GoodBye!\n");
+            break;
+        }
 
         clearBuffer(buf, MAXLINE);
         printf("> "); // Fgets blocks until newline, so it won't be needed here
@@ -98,7 +96,6 @@ void receiverRoutine() {
     while (!killProgram) {
         Rio_readlineb(&rio, buf, MAXLINE);
 
-        // TODO: test this. also, what if text was typed into console (enter not pressed)?
         // Maybe don't handle that case? See https://piazza.com/class/jlqsbkrvhww31w?cid=169
         printf("\b\b%s> ", buf); // Backspace the "> ", print buf, and add "> "
         fflush(stdout);
