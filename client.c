@@ -76,6 +76,7 @@ void senderRoutine() {
     char buf[MAXLINE];
 
     printf("> ");
+    fflush(stdout);
     // Note: Fgets puts a trailing \n\0 into buf (after the text entered by user)
     while (!killProgram && Fgets(buf, MAXLINE, stdin) != NULL) {
         sendDataToServer(buf);
@@ -86,6 +87,7 @@ void senderRoutine() {
 
         clearBuffer(buf, MAXLINE);
         printf("> "); // Fgets blocks until newline, so it won't be needed here
+        fflush(stdout);
     }
 }
 
@@ -98,7 +100,8 @@ void receiverRoutine() {
 
         // TODO: test this. also, what if text was typed into console (enter not pressed)?
         // Maybe don't handle that case? See https://piazza.com/class/jlqsbkrvhww31w?cid=169
-        fprintf(stdout, "\b\b%s", buf); // Backspace the "> ", print buf, and add "> "
+        printf("\b\b%s> ", buf); // Backspace the "> ", print buf, and add "> "
+        fflush(stdout);
         clearBuffer(buf, MAXLINE);
     }
 }
