@@ -1,3 +1,24 @@
 Anthony Mendez
+Server.c
+    lockMutex
+    unlockMutex
+    sendDirectMsg
+    handleMessage
+    userList
+Client.c
+    senderRoutine
+    receiverRoutine
+    sendDataToServer
+    clearBuffer
 
 Joshua Howell
+Server.c
+    addClient
+    clearBuffer
+    clientHandlerStart
+    dropClient
+    main
+    thread
+Client.c
+    main
+    thread
