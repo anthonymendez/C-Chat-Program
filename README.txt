@@ -1,5 +1,5 @@
 # C Chat Program
-## Assignment 5
+## Assignment 6
 
 ## Authors
 * Anthony Mendez anthonymende@umass.edu
